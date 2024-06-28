@@ -22,6 +22,7 @@ class Image2AsciiRecipe(ConanFile):
         self.requires("cpr/1.10.5")
         self.requires("cxxopts/3.2.0")
         self.requires("fmt/10.2.1")
+        self.requires("stb/cci.20240213")
 
     def layout(self):
         cmake_layout(self)
