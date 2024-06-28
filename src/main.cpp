@@ -2,8 +2,12 @@
 #include <fmt/core.h>
 #include <cpr/cpr.h>
 #include <fmt/color.h>
-#include <stb_image.h>
-#include <stb_image_resize2.h>
+
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+// #include <stb_image.h>
+// #include <stb_image_resize2.h>
 
 #include <string>
 #include <string_view>
@@ -13,6 +17,7 @@ struct ProgramOptions {
   int width;
 };
 
+/*
 class StbImage {
 public:
   explicit StbImage(const stbi_uc* data, std::size_t size) {
@@ -23,7 +28,7 @@ public:
       &m_width,
       &m_height,
       &m_channels,
-      0
+      STBI_rgb
     );
 
     if (m_data == nullptr) {
@@ -51,6 +56,7 @@ private:
   int m_height;
   int m_channels;
 };
+*/
 
 char luminance_to_ascii(float luminance) {
   static const std::string
@@ -79,6 +85,7 @@ ProgramOptions parse_cli(int argc, char* argv[]) {
   };
 }
 
+/*
 std::string download_image(std::string_view url) {
   cpr::Response r = cpr::Get(cpr::Url{url});
 
@@ -90,35 +97,62 @@ std::string download_image(std::string_view url) {
   fmt::println("The image size is {} bytes", r.text.size());
   return r.text;
 }
+*/
 
+cv::Mat download_image2(std::string_view url) {
+  cpr::Response r = cpr::Get(cpr::Url{url});
+
+  if (r.status_code != 200) {
+
+    throw std::runtime_error{fmt::format("Impossible to download {}. HTTP error {}", url, r.status_code)};
+  }
+
+  cv::Mat rawData( 1, r.text.size(), CV_8UC1, (void*)r.text.data());
+  cv::Mat resultImage = cv::imdecode(rawData, cv::IMREAD_COLOR);
+
+  return resultImage;
+}
+
+/*
 StbImage load_image(std::string_view imageData) {
   return StbImage{
     reinterpret_cast<const stbi_uc*>(imageData.data()),
     imageData.size()
   };
 }
+*/
 
+cv::Mat resize_image2(cv::Mat image, int new_width) {
+  int new_height = static_cast<int>(static_cast<double>(image.cols) / image.rows * new_width * 0.45);
+  cv::Mat result;
+  cv::resize(image, result, cv::Size{new_width, new_height}, 0.0, 0.0, cv::INTER_NEAREST);
+
+  return result;
+}
+
+/*
 StbImage resize_image(const StbImage& image, int new_width) {
   // Adjust aspect ratio for ASCII art
   int new_height = static_cast<int>(static_cast<double>(image.height()) / image.width() * new_width * 0.45);
   int new_channels = image.channels();
-  auto new_buffer = (unsigned char*)malloc(new_width * new_height * new_channels);
+  auto new_size = new_width * (new_channels + 1) * new_height;
+  auto new_buffer = (unsigned char*)malloc(new_size);
   
   fmt::println("DEBUG: before resizing, new_height: {}", new_height);
 
-  auto newImageData = stbir_resize_uint8_linear(
-    image.data(), image.width(), image.height(), 0, 
+  stbir_resize_uint8_linear(
+    image.data(), image.width(), image.height(), 0,
     new_buffer, new_width, new_height, 0,
     stbir_pixel_layout::STBIR_RGB 
   );
 
-  if (newImageData == nullptr) {
-    throw std::runtime_error{"newImage is null"};
-  }
+  // if (newImageData == nullptr) {
+    // throw std::runtime_error{"newImage is null"};
+  // }
 
-  fmt::println("DEBUG: The new image pointer is {}");
+  // fmt::println("DEBUG: The new image pointer is {}");
 
-  return StbImage(newImageData, new_width * new_height * 3);
+  return StbImage(new_buffer, new_size);
 }
 
 void print_image(const StbImage& image, int new_width) {
@@ -143,14 +177,45 @@ void print_image(const StbImage& image, int new_width) {
     fmt::print("\n");
   }
 }
+*/
+
+void print_ascii_art(cv::Mat image) {
+  int nChannels = image.channels();
+  int nRows = image.rows;
+  int nCols = image.cols * nChannels;
+
+  for(int i = 0; i < nRows; ++i) {
+    auto row = image.ptr<uchar>(i);
+    for(int j = 0; j < nCols; j += nChannels) {
+
+      auto b = row[j + 0] / 255.0;
+      auto g = row[j + 1] / 255.0;
+      auto r = row[j + 2] / 255.0;
+
+      float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+      char ascii_char = luminance_to_ascii(luminance);
+      fmt::print(fmt::fg(fmt::rgb(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255))), "{}", ascii_char);
+    }
+    fmt::print("\n");
+  }
+}
 
 int main(int argc, char* argv[]) {
   try {
     auto options = parse_cli(argc, argv);
-    auto imageData = download_image(options.url);
-    auto image = load_image(imageData);
-    // auto resizedImage = resize_image(image, options.width);
-    print_image(image, options.width);
+    // {
+      // auto imageData = download_image(options.url);
+      // auto image = load_image(imageData);
+      // auto resizedImage = resize_image(image, options.width);
+      // print_image(image, options.width);
+    // }
+
+    
+    auto image = download_image2(options.url);
+    auto resized = resize_image2(image, options.width);
+    print_ascii_art(resized);  
+    // print_ascii_art(image);  
+
     return 0;
   }
   catch(const std::exception& exc) {

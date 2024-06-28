@@ -5,6 +5,7 @@ find_package(cxxopts CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(stb CONFIG REQUIRED)
+find_package(OpenCV CONFIG REQUIRED)
 
 add_executable(img2ascii src/main.cpp)
 
@@ -16,4 +17,6 @@ target_link_libraries(img2ascii
     fmt::fmt
     cpr::cpr
     stb::stb
+    opencv_imgcodecs
+    opencv_imgproc
 )
