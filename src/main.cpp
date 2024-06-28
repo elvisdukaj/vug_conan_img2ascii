@@ -2,12 +2,9 @@
 #include <fmt/core.h>
 #include <cpr/cpr.h>
 #include <fmt/color.h>
-
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
-// #include <stb_image.h>
-// #include <stb_image_resize2.h>
 
 #include <string>
 #include <string_view>
@@ -16,55 +13,6 @@ struct ProgramOptions {
   std::string url;
   int width;
 };
-
-/*
-class StbImage {
-public:
-  explicit StbImage(const stbi_uc* data, std::size_t size) {
-    fmt::println("DEBUG: StbImage({}, {})", (const void*)data, size);
-      m_data = stbi_load_from_memory(
-      data,
-      size,
-      &m_width,
-      &m_height,
-      &m_channels,
-      STBI_rgb
-    );
-
-    if (m_data == nullptr) {
-      throw std::runtime_error{"Unable to convert the image"};
-    }
-  }
-
-  StbImage(const StbImage&) = delete;
-  StbImage operator=(const StbImage&) = delete;
-
-  ~StbImage() {
-    stbi_image_free(m_data);
-  }
-
-  int width() const noexcept { return m_width; }
-  int height() const noexcept { return m_height; }
-  int channels() const noexcept {return m_channels; }
-  const unsigned char* data() const noexcept { return m_data; }
-
-  unsigned char operator[](size_t index) const noexcept { return m_data[index]; }
-
-private:
-  unsigned char* m_data;
-  int m_width;
-  int m_height;
-  int m_channels;
-};
-*/
-
-char luminance_to_ascii(float luminance) {
-  static const std::string
-    ASCII_CHARS = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
-
-  size_t position = luminance * (ASCII_CHARS.size() - 1);
-  return ASCII_CHARS[position];
-}
 
 ProgramOptions parse_cli(int argc, char* argv[]) {
   cxxopts::Options options("img2ascii", "Convert images to ASCII art");
@@ -85,21 +33,15 @@ ProgramOptions parse_cli(int argc, char* argv[]) {
   };
 }
 
-/*
-std::string download_image(std::string_view url) {
-  cpr::Response r = cpr::Get(cpr::Url{url});
+char luminance_to_ascii(float luminance) {
+  static const std::string
+    ASCII_CHARS = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
 
-  if (r.status_code != 200) {
-
-    throw std::runtime_error{fmt::format("Impossible to download {}. HTTP error {}", url, r.status_code)};
-  }
-
-  fmt::println("The image size is {} bytes", r.text.size());
-  return r.text;
+  size_t position = luminance * (ASCII_CHARS.size() - 1);
+  return ASCII_CHARS[position];
 }
-*/
 
-cv::Mat download_image2(std::string_view url) {
+cv::Mat download_image(std::string_view url) {
   cpr::Response r = cpr::Get(cpr::Url{url});
 
   if (r.status_code != 200) {
@@ -113,71 +55,13 @@ cv::Mat download_image2(std::string_view url) {
   return resultImage;
 }
 
-/*
-StbImage load_image(std::string_view imageData) {
-  return StbImage{
-    reinterpret_cast<const stbi_uc*>(imageData.data()),
-    imageData.size()
-  };
-}
-*/
-
-cv::Mat resize_image2(cv::Mat image, int new_width) {
-  int new_height = static_cast<int>(static_cast<double>(image.cols) / image.rows * new_width * 0.45);
+cv::Mat resize_image(cv::Mat image, int new_width) {
+  int new_height = static_cast<int>(static_cast<double>(image.cols) / image.rows * new_width * .2);
   cv::Mat result;
   cv::resize(image, result, cv::Size{new_width, new_height}, 0.0, 0.0, cv::INTER_NEAREST);
 
   return result;
 }
-
-/*
-StbImage resize_image(const StbImage& image, int new_width) {
-  // Adjust aspect ratio for ASCII art
-  int new_height = static_cast<int>(static_cast<double>(image.height()) / image.width() * new_width * 0.45);
-  int new_channels = image.channels();
-  auto new_size = new_width * (new_channels + 1) * new_height;
-  auto new_buffer = (unsigned char*)malloc(new_size);
-  
-  fmt::println("DEBUG: before resizing, new_height: {}", new_height);
-
-  stbir_resize_uint8_linear(
-    image.data(), image.width(), image.height(), 0,
-    new_buffer, new_width, new_height, 0,
-    stbir_pixel_layout::STBIR_RGB 
-  );
-
-  // if (newImageData == nullptr) {
-    // throw std::runtime_error{"newImage is null"};
-  // }
-
-  // fmt::println("DEBUG: The new image pointer is {}");
-
-  return StbImage(new_buffer, new_size);
-}
-
-void print_image(const StbImage& image, int new_width) {
-  // Adjust aspect ratio for ASCII art
-  int new_height = static_cast<int>(static_cast<double>(image.height()) / image.width() * new_width * 0.45);
-
-  for (int i = 0; i < new_height; ++i) {
-    for (int j = 0; j < new_width; ++j) {
-      int old_i = i * image.height() / new_height;
-      int old_j = j * image.width() / new_width;
-
-      float r = image[(old_i * image.width() + old_j) * image.channels() + 0] / 255.0f;
-      float g = image[(old_i * image.width() + old_j) * image.channels() + 1] / 255.0f;
-      float b = image[(old_i * image.width() + old_j) * image.channels() + 2] / 255.0f;
-      float luminance = (0.2126f * r + 0.7152f * g + 0.0722f * b);
-
-      char ascii_char = luminance_to_ascii(luminance);
-
-      // Use fmt to print ASCII character with color
-      fmt::print(fmt::fg(fmt::rgb(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255))), "{}", ascii_char);
-    }
-    fmt::print("\n");
-  }
-}
-*/
 
 void print_ascii_art(cv::Mat image) {
   int nChannels = image.channels();
@@ -203,19 +87,9 @@ void print_ascii_art(cv::Mat image) {
 int main(int argc, char* argv[]) {
   try {
     auto options = parse_cli(argc, argv);
-    // {
-      // auto imageData = download_image(options.url);
-      // auto image = load_image(imageData);
-      // auto resizedImage = resize_image(image, options.width);
-      // print_image(image, options.width);
-    // }
-
-    
-    auto image = download_image2(options.url);
-    auto resized = resize_image2(image, options.width);
+    auto image = download_image(options.url);
+    auto resized = resize_image(image, options.width);
     print_ascii_art(resized);  
-    // print_ascii_art(image);  
-
     return 0;
   }
   catch(const std::exception& exc) {
