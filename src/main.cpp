@@ -4,15 +4,36 @@
 #include <fmt/color.h>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-
-
 #include <string>
 #include <string_view>
 
 struct ProgramOptions {
   std::string url;
-  int width;
+  int width;  
 };
+
+ProgramOptions parse_cli(int argc, char* argv[]);
+cv::Mat download_image(std::string_view url);
+cv::Mat resize_image(cv::Mat image, int new_width);
+void print_ascii_art(cv::Mat image);
+
+int main(int argc, char* argv[]) {
+  try {
+    auto options = parse_cli(argc, argv);
+    auto image = download_image(options.url);
+    auto resized = resize_image(image, options.width);
+    print_ascii_art(resized);  
+    return 0;
+  }
+  catch(const std::exception& exc) {
+    fmt::println("Something went wrong: {}", exc.what());
+  }
+  catch(...) {
+    fmt::println("Something went really wrong");
+  }
+  
+  return 1;
+}
 
 ProgramOptions parse_cli(int argc, char* argv[]) {
   cxxopts::Options options("img2ascii", "Convert images to ASCII art");
@@ -58,7 +79,7 @@ cv::Mat download_image(std::string_view url) {
 cv::Mat resize_image(cv::Mat image, int new_width) {
   int new_height = static_cast<int>(static_cast<double>(image.cols) / image.rows * new_width * .2);
   cv::Mat result;
-  cv::resize(image, result, cv::Size{new_width, new_height}, 0.0, 0.0, cv::INTER_NEAREST);
+  cv::resize(image, result, cv::Size{new_width, new_height}, 0.0, 0.0, cv::INTER_LINEAR);
 
   return result;
 }
@@ -82,22 +103,4 @@ void print_ascii_art(cv::Mat image) {
     }
     fmt::print("\n");
   }
-}
-
-int main(int argc, char* argv[]) {
-  try {
-    auto options = parse_cli(argc, argv);
-    auto image = download_image(options.url);
-    auto resized = resize_image(image, options.width);
-    print_ascii_art(resized);  
-    return 0;
-  }
-  catch(const std::exception& exc) {
-    fmt::println("Something went wrong: {}", exc.what());
-  }
-  catch(...) {
-    fmt::println("Something went really wrong");
-  }
-  
-  return 1;
 }
