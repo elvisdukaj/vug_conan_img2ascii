@@ -32,6 +32,7 @@ class Image2AsciiRecipe(ConanFile):
         deps = CMakeDeps(self)
         deps.generate()
         tc = CMakeToolchain(self)
+        tc.variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = True
         tc.generate()
 
     def build(self):
