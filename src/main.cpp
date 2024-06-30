@@ -61,7 +61,7 @@ std::optional<ProgramOptions> parse_cli(int argc, char *argv[]) {
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
       fmt::println("{}", options.help());
-      return {};
+      exit(0);
     }
 
     return ProgramOptions{.url = result["url"].as<std::string>(), .width = result["width"].as<int>()};
@@ -120,6 +120,7 @@ std::string to_ascii_art(cv::Mat image) {
 
       const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
       const char ascii_char = luminance_to_ascii(luminance);
+
       result.append(fmt::format(fmt::fg(fmt::rgb(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255))), "{}", ascii_char));
     }
     result.append("\n");
