@@ -7,32 +7,26 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 
 struct ProgramOptions {
   std::string url;
   int width;
 };
 
-struct DownloadedImageAndOptions {
-  cv::Mat image;
-  const ProgramOptions &options;
-};
-
 std::optional<ProgramOptions> parse_cli(int argc, char *argv[]);
-std::optional<DownloadedImageAndOptions> download_image(const ProgramOptions &url);
-cv::Mat resize_image(const DownloadedImageAndOptions &imageAndOptions);
+std::optional<cv::Mat> download_and_resize_image(ProgramOptions options);
 std::string to_ascii_art(cv::Mat image);
 
 int main(int argc, char *argv[]) {
   // clang-format off
   const auto ascii_art =
       parse_cli(argc, argv)
-        .and_then(download_image)
-        .transform(resize_image)
+        .and_then(download_and_resize_image)
         .transform(to_ascii_art)
-        .value_or("Sorry, something went wrong!")
-      ;
-  // clang-format on 
+        .value_or("Sorry, something went wrong!");
+  // clang-format on
+
   fmt::print("{}", ascii_art);
   return 0;
 }
@@ -66,40 +60,52 @@ std::optional<ProgramOptions> parse_cli(int argc, char *argv[]) {
 
     return ProgramOptions{.url = result["url"].as<std::string>(), .width = result["width"].as<int>()};
   } catch (...) {
-    return {};
+    return std::nullopt;
   }
 }
 
-std::optional<DownloadedImageAndOptions> download_image(const ProgramOptions &options) {
-  cpr::Response r = cpr::Get(cpr::Url{options.url});
+cv::Mat resize_image(cv::Mat image, int new_width) {
+  const auto width_factor = new_width * 0.15;
 
-  if (r.status_code != 200) {
-    return {};
-  }
+  int new_height = static_cast<int>(
+      static_cast<double>(image.cols) / image.rows * width_factor);
 
-  cv::Mat rawData(1, r.text.size(), CV_8UC1, (void *)r.text.data());
-  cv::Mat resultImage = cv::imdecode(rawData, cv::IMREAD_COLOR);
-
-  return DownloadedImageAndOptions{resultImage, options};
-}
-
-cv::Mat resize_image(const DownloadedImageAndOptions &imageAndOptions) {
-  const auto &image = imageAndOptions.image;
-  const auto new_width = imageAndOptions.options.width;
-
-  int new_height = static_cast<int>(static_cast<double>(image.cols) / image.rows * new_width * .2);
   cv::Mat result;
-  cv::resize(image, result, cv::Size{new_width, new_height}, 0.0, 0.0, cv::INTER_LINEAR);
+  const double fx = 0.0, fy = 0.0;
+  cv::resize(
+      image, result,
+      cv::Size{new_width, new_height},
+      fx, fy,
+      cv::INTER_LINEAR
+  );
 
   return result;
 }
 
-char luminance_to_ascii(float luminance) {
+std::optional<cv::Mat> download_and_resize_image(ProgramOptions options) {
+  cpr::Response r = cpr::Get(cpr::Url{options.url});
+
+  if (r.status_code != 200) {
+    return std::nullopt;
+  }
+
+  cv::Mat raw_data(1, size(r.text), CV_8UC1, std::data(r.text));
+  cv::Mat image = cv::imdecode(raw_data, cv::IMREAD_COLOR);
+
+  return resize_image(image, options.width);
+}
+
+char luminance_to_ascii(std::floating_point auto luminance) {
   // clang-format off
-  static const std::string ASCII_CHARS = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
+  constexpr std::string_view ASCII_CHARS =
+    " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neo"
+    "Z5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
   // clang-format on
 
-  size_t position = luminance * (ASCII_CHARS.size() - 1);
+  const auto position = static_cast<size_t>(
+      std::round(
+          luminance * (ASCII_CHARS.size() - 1))
+      );
   return ASCII_CHARS[position];
 }
 
@@ -113,16 +119,19 @@ std::string to_ascii_art(cv::Mat image) {
   for (int i = 0; i < rows; ++i) {
     const auto row_view = image.ptr<uchar>(i);
     for (int j = 0; j < cols; j += channels) {
+      const auto b = row_view[j + 0];
+      const auto g = row_view[j + 1];
+      const auto r = row_view[j + 2];
 
-      const auto b = row_view[j + 0] / 255.0;
-      const auto g = row_view[j + 1] / 255.0;
-      const auto r = row_view[j + 2] / 255.0;
+      const auto bf = b / 255.0;
+      const auto gf = g / 255.0;
+      const auto rf = r / 255.0;
 
-      const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+      const auto luminance = 0.2126 * rf + 0.7152 * gf + 0.0722 * bf;
       const char ascii_char = luminance_to_ascii(luminance);
 
-      result.append(fmt::format(fmt::fg(fmt::rgb(uint8_t(r * 255), uint8_t(g * 255), uint8_t(b * 255))), "{}", ascii_char));
-    }
+      result.append(fmt::format(fmt::fg(fmt::rgb(r, g, b)), "{}", ascii_char));
+    } // End of col
     result.append("\n");
   }
   return result;
