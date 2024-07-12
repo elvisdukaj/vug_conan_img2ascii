@@ -8,8 +8,6 @@ find_package(OpenCV CONFIG REQUIRED)
 
 add_executable(img2ascii src/main.cpp)
 
-target_compile_features(img2ascii PRIVATE cxx_std_23)
-
 target_link_libraries(img2ascii
   PRIVATE
     cxxopts::cxxopts
