@@ -23,7 +23,11 @@ class Image2AsciiRecipe(ConanFile):
 
     def layout(self):
         self.folders.build_folder_vars = [
-            "settings.os", "settings.ndk_version", "settings.compiler", "settings.compiler.version", "settings.arch", "settings.build_type"
+            "settings.os",
+            "settings.ndk_version",
+            "settings.compiler",
+            "settings.compiler.version",
+            "settings.arch"
         ]
         cmake_layout(self)
 
@@ -38,3 +42,4 @@ class Image2AsciiRecipe(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
