@@ -22,6 +22,9 @@ class Image2AsciiRecipe(ConanFile):
         self.requires("opencv/4.9.0")
 
     def layout(self):
+        self.folders.build_folder_vars = [
+            "settings.os", "settings.ndk_version", "settings.compiler", "settings.compiler.version", "settings.arch", "settings.build_type"
+        ]
         cmake_layout(self)
 
     def generate(self):
